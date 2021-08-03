@@ -22,6 +22,11 @@ road_network::road_network(std::vector<node> nodes)
     }
 }
 
+road_network::road_network(std::vector<std::vector<double>> distance_matrix)
+{
+    this->distance_matrix = distance_matrix;
+}
+
 // NOT WORKING
 void road_network::add_node(node p)
 {
@@ -50,5 +55,5 @@ double road_network::get_distance(int node1, int node2)
 
 int road_network::size()
 {
-    return nodes.size();
+    return distance_matrix.size();
 }
