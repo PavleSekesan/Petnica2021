@@ -1,6 +1,7 @@
 #include "physarum_solver.h"
 #include "math.h"
 #include <iostream>
+#include <iomanip>
 #include <../Eigen/QR>
 
 physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity)
@@ -9,6 +10,8 @@ physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehi
     flow_matrix = std::vector<std::vector<double>>(rn.size(), std::vector<double>(rn.size()));
     conductivity_matrix = std::vector<std::vector<double>>(rn.size(), std::vector<double>(rn.size(), initial_conductivity));
     node_pressures = std::vector<double>(rn.size());
+    flux_vector = std::vector<double>(rn.size());
+    initialize_flux();
 }
 
 physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity, double initial_flux, double initial_conductivity, double shrink_rate, double dt)
@@ -47,7 +50,7 @@ void physarum_solver::update_pressures_exact()
             coefficient_matrix(i, i) = -current_sum;
     }
 
-    // Create b = [initial_flux, 0, 0, 0, 0, ..., 0, -initial_flux]
+    // Create b = [initial_flux, 0, 0, 0, 0, ..., 0, -initial_flux] (SHOULD BE MODIFIED FOR VRP)
     Eigen::VectorXd flux_vector(rn.size());
     flux_vector(0) = initial_flux;
     for(int i = 1; i < rn.size() - 2; i++)
@@ -64,8 +67,7 @@ void physarum_solver::update_pressures()
     // node_pressures[V - 1] = 0
     for(int i = 0; i < rn.size() - 1; i++)
     {
-        double numerator = 0;
-        if (i == 0) numerator = initial_flux;
+        double numerator = flux_vector[i];
         double denominator = 0;
         for(int j = 0; j < rn.size(); j++)
         {
@@ -79,6 +81,40 @@ void physarum_solver::update_pressures()
         node_pressures[i] = numerator / denominator;
     }
     return;
+}
+
+void physarum_solver::initialize_flux()
+{
+    if (rn.is_planar())
+    {
+        double node_demand_sum = 0;
+        for(int i = 1; i < rn.size(); i++)
+        {
+            node_demand_sum += rn.get_node(i).demand;
+        }
+
+        // normalize node demands to determine flux vector
+        flux_vector[0] = initial_flux;
+        for(int i = 1; i < rn.size(); i++)
+        {
+            // FIX THIS
+            flux_vector[i] = -initial_flux * (1 - rn.get_node(i).demand / node_demand_sum);
+        }
+
+        std::cout << "Flux vector:\n";
+        for(int i = 0; i < rn.size(); i++)
+        {
+            std::cout << flux_vector[i] << " ";
+        }
+        std::cout << "\n";
+    }
+    else
+    {
+        flux_vector[0] = initial_flux;
+        for(int i = 1; i < rn.size() - 2; i++)
+            flux_vector[i] = 0;
+        flux_vector[rn.size() - 1] = -initial_flux;
+    }
 }
 
 void physarum_solver::update_flow()
@@ -112,17 +148,19 @@ void physarum_solver::update_conductivities()
     }
 }
 
-void physarum_solver::solve()
+std::vector<int> physarum_solver::solve()
 {
-    int iteration_cnt = 100;
-
+    *output << iteration_cnt << std::endl;
     for(int iteration = 0; iteration < iteration_cnt; iteration++)
     {
         update_pressures();
         update_flow();
         update_conductivities();
+        *output << std::setprecision(2) << std::fixed;
+        *output << *this << std::endl;
     }
 
+    // Determine path by choosing edges with largest flow
     std::vector<int> path;
     int current_node = 0;
     path.push_back(current_node);
@@ -146,16 +184,59 @@ void physarum_solver::solve()
         current_node = node_max;
     }
 
-    double path_length = 0;
-    for(int i = 0; i < path.size(); i++)
+    return path;
+}
+
+std::ostream& operator<<(std::ostream& os, const physarum_solver& ps)
+{
+    bool print_flow = true;
+    bool print_conductivities = true;
+    bool print_pressures = true;
+    int print_size_limit = 100;
+    auto n = ps.rn.size();
+
+    if (n <= print_size_limit)
     {
-        std::cout << path[i] << " ";
+        // Print flow
+        if (print_flow)
+        {
+            os << "Flow: \n";
+            for(int i = 0; i < n; i++)
+            {
+                for(int j = 0; j < n; j++)
+                {
+                    os << ps.flow_matrix[i][j] << " ";
+                }
+                os << std::endl;
+            }
+        }
+
+        // Print conductivities
+        if (print_conductivities)
+        {
+            //os << "Conductivities: \n";
+            for(int i = 0; i < n; i++)
+            {
+                for(int j = 0; j < n; j++)
+                {
+                    os << ps.conductivity_matrix[i][j] << " ";
+                }
+                os << std::endl;
+            }
+        }
+
+        // Print pressures
+        if (print_pressures)
+        {
+            os << "Pressures: \n";
+            for(int i = 0; i < n; i++)
+                os << ps.node_pressures[i] << " ";
+        }
     }
-    std::cout << std::endl;
-    for(int i = 0; i < path.size() - 1; i++)
+    else
     {
-        path_length += rn.get_distance(path[i], path[i + 1]);
+        os << "Solver too large to print";
     }
-    std::cout << path_length << std::endl;
+    return os;
 }
 

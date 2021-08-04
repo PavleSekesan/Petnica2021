@@ -53,7 +53,22 @@ double road_network::get_distance(int node1, int node2)
     return distance_matrix[node1][node2];
 }
 
-int road_network::size()
+int road_network::size() const
 {
     return distance_matrix.size();
+}
+
+bool road_network::is_planar()
+{
+    return !nodes.empty();
+}
+
+std::ostream& operator<<(std::ostream& os, const road_network& rn)
+{
+    for(int i = 0; i < rn.size(); i++)
+    {
+        for(int j = 0; j < rn.size(); j++)
+            os << rn.distance_matrix[i][j] << " ";
+        os << std::endl;
+    }
 }

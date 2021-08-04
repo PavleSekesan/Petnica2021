@@ -15,3 +15,9 @@ double node::distance(node p2)
 
     return std::sqrt(dx * dx + dy * dy);
 }
+
+std::ostream& operator<<(std::ostream& os, const node& n)
+{
+    os << "X: " << n.x << " Y: " << n.y;
+    return os;
+}
