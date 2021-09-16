@@ -2,6 +2,7 @@
 #include <iomanip>
 #include "road_network.h"
 #include "physarum_solver.h"
+#include "nsga_solver.h"
 #include <fstream>
 #include <math.h>
 
@@ -42,30 +43,35 @@ int main()
 
     road_network rn = road_network(new_distance_matrix);*/
 
+    freopen("city.txt", "r", stdin);
     int n; std::cin >> n;
     std::vector<node> nodes;
-    for(int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++)
     {
-        int x, y; std::cin >> x >> y;
-        double demand; std::cin >> demand;
-        nodes.push_back(node(x, y, demand));
+        double x, y, pop; std::cin >> y >> x >> pop;
+        nodes.push_back(node(x, y, pop));
     }
 
     road_network rn = road_network(nodes);
 
-    std::ofstream file("data/conductivities.txt");
+    /*std::ofstream file("C:/Users/Pavle/Desktop/Petnica2021 pomocne skripte/conductivities.txt");
     physarum_solver ps = physarum_solver(rn, 1, 1000);
-    ps.set_stream(std::cout);
-    std::vector<int> path = ps.solve();
-    double path_length = 0;
-    for(int i = 0; i < path.size(); i++)
+    ps.set_stream(file);
+    std::vector<int> path = ps.solve();*/
+    /*double path_length = 0;
+    for (int i = 0; i < path.size(); i++)
     {
         std::cout << path[i] << " ";
     }
     std::cout << std::endl;
-    for(int i = 0; i < path.size() - 1; i++)
+    for (int i = 0; i < path.size() - 1; i++)
     {
         path_length += rn.get_distance(path[i], path[i + 1]);
     }
-    std::cout << path_length << std::endl;
+    std::cout << path_length << std::endl;*/
+
+    std::ofstream file1("C:/Users/Pavle/Desktop/Petnica2021 pomocne skripte/nsga.txt");
+    nsga_solver ns = nsga_solver(rn, 1, 1000);
+    ns.set_stream(file1);
+    std::vector<int> path1 = ns.solve();
 }

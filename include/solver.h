@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include "road_network.h"
+#include "evaluator.h"
 
 class solver
 {
@@ -8,6 +9,7 @@ protected:
     road_network rn;
     int vehicle_limit;
     double vehicle_capacity;
+    evaluator evaluator;
     std::ostream* output = &std::cout;
 public:
     solver(road_network rn, int vehicle_limit, double vehicle_capacity);
