@@ -10,8 +10,10 @@ organism::organism(int genome_size, bool random)
 	this->genome_size = genome_size;
 	rank = -1;
 	crowding_distance = -INFINITY;
-	objective_evaluation = std::vector<double>(2);
-	double ones = 0;
+	objective_evaluation = std::vector<double>(3);
+	int ones = 0;
+	double max_ones_percent = 0.15;
+	int max_ones = max_ones_percent * genome_size * genome_size;
 	genome = std::vector<std::vector<bool>>(genome_size, std::vector<bool>(genome_size));
 	if (random)
 	{
@@ -19,11 +21,11 @@ organism::organism(int genome_size, bool random)
 		{
 			for (int j = i + 1; j < genome_size; j++)
 			{
-				if (ones <= 100)
+				if (ones <= max_ones_percent * genome_size * genome_size)
 				{
-					genome[i][j] = rand() % 2;
+					genome[i][j] = random_gen::uniform_int(2);
 					genome[j][i] = genome[i][j];
-					ones += genome[i][j];
+					ones += 2 * genome[i][j];
 				}
 			}
 		}
@@ -32,13 +34,13 @@ organism::organism(int genome_size, bool random)
 
 void organism::mutate(double mutation_rate)
 {
-	double rng = (double)rand() / RAND_MAX;
-	if (rng <= mutation_rate)
+	double rand_dbl = random_gen::uniform_real();
+	if (rand_dbl <= mutation_rate)
 	{
 		for (int i = 0; i < 1; i++)
 		{
-			int rand_node1 = rand() % genome_size;
-			int rand_node2 = rand() % genome_size;
+			int rand_node1 = random_gen::uniform_int(genome_size);
+			int rand_node2 = random_gen::uniform_int(genome_size);
 			genome[rand_node1][rand_node2] = !genome[rand_node1][rand_node2];
 			genome[rand_node2][rand_node1] = genome[rand_node1][rand_node2];
 		}
@@ -52,7 +54,7 @@ organism organism::crossover(organism parent)
 	{
 		for (int j = i + 1; j < genome_size; j++)
 		{
-			bool pass_my_gene = rand() % 2;
+			bool pass_my_gene = random_gen::uniform_int(2);
 			if (pass_my_gene)
 			{
 				child.genome[i][j] = this->genome[i][j];

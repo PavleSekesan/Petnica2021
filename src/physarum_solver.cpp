@@ -4,8 +4,8 @@
 #include <iostream>
 #include <iomanip>
 
-physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity)
-    : solver(rn, vehicle_limit, vehicle_capacity)
+physarum_solver::physarum_solver(road_network rn)
+    : solver(rn)
 {
     flow_matrix = std::vector<std::vector<double>>(rn.size(), std::vector<double>(rn.size()));
     conductivity_matrix = std::vector<std::vector<double>>(rn.size(), std::vector<double>(rn.size(), initial_conductivity));
@@ -14,14 +14,16 @@ physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehi
     initialize_flux();
 }
 
-physarum_solver::physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity, double initial_flux, double initial_conductivity, double shrink_rate, double dt)
-    : solver(rn, vehicle_limit, vehicle_capacity)
+physarum_solver::physarum_solver(road_network rn, double initial_flux, double initial_conductivity, double shrink_rate, double dt, double gamma, int iteration_cnt)
+    : solver(rn)
 {
     this->initial_flux = initial_flux;
     this->initial_conductivity = initial_conductivity;
     this->shrink_rate = shrink_rate;
     this->dt = dt;
-    physarum_solver(rn, vehicle_limit, vehicle_capacity);
+    this->gamma = gamma;
+    this->iteration_cnt = iteration_cnt;
+    physarum_solver::physarum_solver(rn);
 }
 
 /*
@@ -66,64 +68,72 @@ void physarum_solver::update_pressures_exact()
 
 void physarum_solver::choose_source_sink_pair()
 {
-    current_sink_node = rand() % rn.size();
-    double cumulative_population = 0.0;
-    for (int i = 0; i < rn.size(); i++)
+    bool select_demand_weighted_random = true;
+    
+    if (select_demand_weighted_random)
     {
-        cumulative_population += rn.get_node(i).demand;
-    }
-
-    // Sink
-    double rand_number = (double)rand() / RAND_MAX;
-    double prefix = 0.0;
-    for (int i = 0; i < rn.size(); i++)
-    {
-        prefix += rn.get_node(i).demand / cumulative_population;
-        if (prefix >= rand_number)
+        double cumulative_demand = 0.0;
+        for (int i = 0; i < rn.size(); i++)
         {
-            current_sink_node = i;
-            break;
+            cumulative_demand += rn.get_node(i).demand;
         }
-    }
 
-    cumulative_population -= rn.get_node(current_sink_node).demand;
-    // Source
-    rand_number = (double)rand() / RAND_MAX;
-    prefix = 0.0;
-    for (int i = 0; i < rn.size(); i++)
-    {
-        if (i != current_sink_node)
+        // Sink
+        double rand_number = random_gen::uniform_real();
+        double prefix = 0.0;
+        for (int i = 0; i < rn.size(); i++)
         {
-            prefix += rn.get_node(i).demand / cumulative_population;
+            prefix += rn.get_node(i).demand / cumulative_demand;
             if (prefix >= rand_number)
             {
-                current_source_node = i;
+                current_sink_node = i;
                 break;
             }
         }
-    }
-    /*double cumulative_distance_to_sink = 0.0;
-    for (int i = 0; i < rn.size(); i++)
-    {
-        if (i != current_sink_node)
+
+        cumulative_demand -= rn.get_node(current_sink_node).demand;
+        // Source
+        rand_number = random_gen::uniform_real();
+        prefix = 0.0;
+        for (int i = 0; i < rn.size(); i++)
         {
-            cumulative_distance_to_sink += rn.get_distance(current_sink_node, i);
-        }
-    }
-    double rand_number2 = (double)rand() / RAND_MAX;
-    double prefix2 = 0.0;
-    for (int i = 0; i < rn.size(); i++)
-    {
-        if (i != current_sink_node)
-        {
-            prefix2 += rn.get_distance(current_sink_node, i) / cumulative_distance_to_sink;
-            if (prefix2 >= rand_number2)
+            if (i != current_sink_node)
             {
-                current_source_node = i;
-                break;
+                prefix += rn.get_node(i).demand / cumulative_demand;
+                if (prefix >= rand_number)
+                {
+                    current_source_node = i;
+                    break;
+                }
             }
         }
-    }*/
+    }
+    else
+    {
+        current_sink_node = random_gen::uniform_int(rn.size());
+        double cumulative_distance_to_sink = 0.0;
+        for (int i = 0; i < rn.size(); i++)
+        {
+            if (i != current_sink_node)
+            {
+                cumulative_distance_to_sink += rn.get_distance(current_sink_node, i);
+            }
+        }
+        double rand_number2 = random_gen::uniform_real();
+        double prefix2 = 0.0;
+        for (int i = 0; i < rn.size(); i++)
+        {
+            if (i != current_sink_node)
+            {
+                prefix2 += rn.get_distance(current_sink_node, i) / cumulative_distance_to_sink;
+                if (prefix2 >= rand_number2)
+                {
+                    current_source_node = i;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void physarum_solver::update_pressures()
@@ -149,36 +159,10 @@ void physarum_solver::update_pressures()
 
 void physarum_solver::initialize_flux()
 {
-    if (!rn.is_planar())
-    {
-        double node_demand_sum = 0;
-        for (int i = 1; i < rn.size(); i++)
-        {
-            node_demand_sum += rn.get_node(i).demand;
-        }
-
-        // normalize node demands to determine flux vector
-        flux_vector[0] = initial_flux;
-        for (int i = 1; i < rn.size(); i++)
-        {
-            // FIX THIS
-            flux_vector[i] = -initial_flux * (1 - rn.get_node(i).demand / node_demand_sum);
-        }
-
-        /*std::cout << "Flux vector:\n";
-        for (int i = 0; i < rn.size(); i++)
-        {
-            std::cout << flux_vector[i] << " ";
-        }
-        std::cout << "\n";*/
-    }
-    else
-    {
-        for (int i = 0; i < rn.size(); i++)
-            flux_vector[i] = 0;
-        flux_vector[current_source_node] = initial_flux;
-        flux_vector[current_sink_node] = -initial_flux;
-    }
+    for (int i = 0; i < rn.size(); i++)
+        flux_vector[i] = 0;
+    flux_vector[current_source_node] = initial_flux;
+    flux_vector[current_sink_node] = -initial_flux;
 }
 
 void physarum_solver::update_flow()
@@ -191,14 +175,9 @@ void physarum_solver::update_flow()
             {
                 double pressure_difference = node_pressures[i] - node_pressures[j];
                 flow_matrix[i][j] = conductivity_matrix[i][j] / rn.get_distance(i, j) * pressure_difference;
-                //if (abs(flow_matrix[i][j]) < epsilon)
-                //    flow_matrix[i][j] = 0.0;
                 if (isnan(flow_matrix[i][j]))
                 {
-                    std::cout << rn.get_distance(i, j) << " ";
-                    std::cout << pressure_difference << " ";
-                    std::cout << "AAAAAAA";
-                    while (true) {}
+                    std::cerr << "Flow is NaN" << std::endl;
                 }
             }
         }
@@ -225,10 +204,8 @@ void physarum_solver::update_conductivities()
     }
 }
 
-std::vector<int> physarum_solver::solve()
+void physarum_solver::solve()
 {
-    //*output << iteration_cnt << std::endl;
-    //for (int iteration = 0; iteration < iteration_cnt; iteration++)
     int iteration = 0;
     while(iteration < iteration_cnt)
     {
@@ -243,30 +220,6 @@ std::vector<int> physarum_solver::solve()
     *output << std::setprecision(2) << std::fixed;
     *output << *this << std::endl;
 
-    // Determine path by choosing edges with largest flow
-    std::vector<int> path;
-    int current_node = 0;
-    path.push_back(current_node);
-    /*while (current_node != rn.size() - 1)
-    {
-        double max_flow = -INFINITY;
-        int node_max = -1;
-        for (int i = 0; i < rn.size(); i++)
-        {
-            if (i != current_node)
-            {
-                double curr_weight = flow_matrix[current_node][i];
-                if (curr_weight > max_flow)
-                {
-                    max_flow = curr_weight;
-                    node_max = i;
-                }
-            }
-        }
-        path.push_back(node_max);
-        current_node = node_max;
-    }*/
-
     std::vector<std::vector<bool>> connected(rn.size(), std::vector<bool>(rn.size(), false));
     for (int i = 0; i < rn.size(); i++)
     {
@@ -277,8 +230,8 @@ std::vector<int> physarum_solver::solve()
         }
     }
     *output << evaluator.evaluate_construction_cost(connected) << std::endl;
+    *output << evaluator.evaluate_fault_tolerance(connected) << std::endl;
     *output << evaluator.evaluate_weighted_min_distances_sum(connected) << std::endl;
-    return path;
 }
 
 std::ostream& operator<<(std::ostream& os, const physarum_solver& ps)

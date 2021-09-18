@@ -7,8 +7,8 @@ void nsga_solver::generate_new_population()
     {
         organism parent1 = organism(rn.size());
         organism parent2 = organism(rn.size());
-        organism o1 = population[rand() % population.size()];
-        organism o2 = population[rand() % population.size()];
+        organism o1 = population[random_gen::uniform_int(population.size())];
+        organism o2 = population[random_gen::uniform_int(population.size())];
         if (o1.crowded_comparison(o2))
         {
             parent1 = o1;
@@ -17,8 +17,8 @@ void nsga_solver::generate_new_population()
         {
             parent1 = o2;
         }
-        o1 = population[rand() % population.size()];
-        o2 = population[rand() % population.size()];
+        o1 = population[random_gen::uniform_int(population.size())];
+        o2 = population[random_gen::uniform_int(population.size())];
         if (o1.crowded_comparison(o2))
         {
             parent2 = o1;
@@ -43,8 +43,8 @@ void nsga_solver::evaluate_population()
     for (int i = 0; i < population.size(); i++)
     {
         population[i].objective_evaluation[0] = evaluator.evaluate_construction_cost(population[i].genome);
-        //population[i].objective_evaluation[1] = evaluator.evaluate_fault_tolerance(population[i].genome);
-        population[i].objective_evaluation[1] = evaluator.evaluate_weighted_min_distances_sum(population[i].genome);
+        population[i].objective_evaluation[1] = evaluator.evaluate_fault_tolerance(population[i].genome);
+        population[i].objective_evaluation[2] = evaluator.evaluate_weighted_min_distances_sum(population[i].genome);
     }
 }
 
@@ -132,15 +132,58 @@ void nsga_solver::crowding_distance_assignment(std::vector<organism>& front)
     }
 }
 
+void nsga_solver::print_solver_header()
+{
+    std::cout << "NSGA-II solver" << std::endl;
+    std::cout << "Hyperparameters:" << std::endl;
+    std::cout << "Mutation rate: " << mutation_rate << std::endl;
+    std::cout << "Population size: " << population_size << std::endl;
+    std::cout << "Generation count: " << generation_count << std::endl;
+    std::cout << std::endl;
+}
+
+void nsga_solver::print_generation(int generation)
+{
+    std::cout << "Generation " << generation + 1 << ":" << std::endl;
+    int i = 0;
+    for (organism o : population)
+    {
+        std::cout << i << ": ";
+        for (auto objective : o.objective_evaluation)
+        {
+            std::cout << objective << " ";
+        }
+        std::cout << std::endl;
+        i++;
+    }
+
+    std::vector<std::pair<double, int>> min_objectives(population[0].objective_evaluation.size(), { INFINITY, -1 });
+    for (int i = 0; i < population.size(); i++)
+    {
+        organism o = population[i];
+        for (int objective = 0; objective < o.objective_evaluation.size(); objective++)
+        {
+            if (o.objective_evaluation[objective] < min_objectives[objective].first)
+            {
+                min_objectives[objective].first = o.objective_evaluation[objective];
+                min_objectives[objective].second = i;
+            }
+        }
+    }
+    std::cout << "Minimum cost, organism " << min_objectives[0].second << ": " << min_objectives[0].first << std::endl;
+    std::cout << "Minimum fault tolerance, organism " << min_objectives[1].second << ": " << min_objectives[1].first << std::endl;
+    std::cout << "Minimum distances sum, organism " << min_objectives[2].second << ": " << min_objectives[2].first << std::endl;
+}
 
 
-nsga_solver::nsga_solver(road_network rn, int vehicle_limit, double vehicle_capacity)
-    : solver(rn, vehicle_limit, vehicle_capacity)
+nsga_solver::nsga_solver(road_network rn)
+    : solver(rn)
 {
 }
 
-std::vector<int> nsga_solver::solve()
+void nsga_solver::solve()
 {
+    print_solver_header();
     // Randomly generated population P0
     population = std::vector<organism>(population_size);
     for (int i = 0; i < population_size; i++)
@@ -158,6 +201,7 @@ std::vector<int> nsga_solver::solve()
 
     for (int generation = 0; generation < generation_count; generation++)
     {
+        // Select retained fronts
         std::vector<std::vector<organism>> fronts = nondominated_sort();
         std::vector<organism> new_population;
         int front_index = 0;
@@ -169,6 +213,7 @@ std::vector<int> nsga_solver::solve()
             front_index++;
         }
         crowding_distance_assignment(fronts[front_index]);
+        // Cut off first front that goes over the population limit
         std::sort(fronts[front_index].begin(), fronts[front_index].end(), [](organism o1, organism o2) { return o1.crowded_comparison(o2); });
         int last_front_cutoff = population_size - new_population.size();
         for (int i = 0; i < last_front_cutoff; i++)
@@ -176,18 +221,7 @@ std::vector<int> nsga_solver::solve()
             new_population.push_back(fronts[front_index][i]);
         }
         population = new_population;
-        double min_distance = INFINITY;
-        int min_ind = -1;
-        for (int i = 0; i < population.size(); i++)
-        {
-            if (population[i].objective_evaluation[0] < min_distance)
-            {
-                min_distance = population[i].objective_evaluation[0];
-                min_ind = i;
-            }
-            
-        }
-        std::cout << min_ind << ": " << min_distance << std::endl;
+        print_generation(generation);
         evaluate_population();
         generate_new_population();
         evaluate_population();
@@ -195,22 +229,23 @@ std::vector<int> nsga_solver::solve()
 
     *output << std::setprecision(2) << std::fixed;
     *output << *this << std::endl;
-
-    return std::vector<int>();
 }
 
 std::ostream& operator<<(std::ostream& os, const nsga_solver& ns)
 {
-    std::cout << "Final organisms:" << std::endl;
+    os << "Final organisms:" << std::endl;
     for (int i = 0; i < ns.population.size(); i++)
     {
         for (int j = 0; j < ns.population[i].objective_evaluation.size(); j++)
         {
-            std::cout << ns.population[i].objective_evaluation[j] << " ";
+            os << ns.population[i].objective_evaluation[j] << " ";
         }
-        std::cout << std::endl;
+        os << std::endl;
     }
-    std::vector<std::vector<bool>> connected = ns.population[1].genome;
+
+    os << "Selected organism genome:" << std::endl;
+    organism selected_organism = ns.population[98];
+    std::vector<std::vector<bool>> connected = selected_organism.genome;
     for (int i = 0; i < connected.size(); i++)
     {
         for (int j = 0; j < connected.size(); j++)
@@ -219,5 +254,9 @@ std::ostream& operator<<(std::ostream& os, const nsga_solver& ns)
         }
         os << std::endl;
     }
+
+    os << "Selected organism evaluations: " << selected_organism.objective_evaluation[0] << " " 
+       << selected_organism.objective_evaluation[1] << " "
+       << selected_organism.objective_evaluation[2] << std::endl;
     return os;
 }

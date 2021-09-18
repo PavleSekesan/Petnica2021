@@ -28,8 +28,8 @@ private:
     void update_conductivities(); // determines conductivities by numerically solving the differential equation d conductivity[i][j] / dt = f(|flow_matrix[i][j]|) - shrink_rate * conductivity[i][j]
 
 public:
-    physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity);
-    physarum_solver(road_network rn, int vehicle_limit, double vehicle_capacity, double initial_flux, double initial_conductivity, double shrink_rate, double dt);
-    std::vector<int> solve();
+    physarum_solver(road_network rn);
+    physarum_solver(road_network rn, double initial_flux, double initial_conductivity, double shrink_rate, double dt, double gamma, int iteration_cnt);
+    void solve();
     friend std::ostream& operator<<(std::ostream& os, const physarum_solver& ps);
 };
