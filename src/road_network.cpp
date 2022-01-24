@@ -11,14 +11,14 @@ road_network::road_network(std::vector<node> nodes)
 {
     this->nodes = nodes;
     this->distance_matrix = std::vector<std::vector<double>>(nodes.size(), std::vector<double>(nodes.size()));
-    for(int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < nodes.size(); i++)
     {
-        for(int j = 0; j < nodes.size(); j++)
+        for (int j = 0; j < nodes.size(); j++)
         {
             distance_matrix[i][j] = nodes[i].distance(nodes[j]);
-            std::cout << distance_matrix[i][j] << " ";
+            //std::cout << distance_matrix[i][j] << " ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
     }
 }
 
@@ -34,12 +34,12 @@ void road_network::add_node(node p)
 
     // Update distance matrix
     std::vector<double> new_distances(nodes.size());
-    for(int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < nodes.size(); i++)
         new_distances[i] = nodes.back().distance(nodes[i]);
-    for(int i = 0 ; i < nodes.size() - 1; i++)
+    for (int i = 0; i < nodes.size() - 1; i++)
         distance_matrix[i].push_back(new_distances[i]);
     distance_matrix.push_back(std::vector<double>(nodes.size()));
-    for(int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < nodes.size(); i++)
         distance_matrix[nodes.size() - 1][i] = new_distances[i];
 }
 
@@ -65,10 +65,12 @@ bool road_network::is_planar()
 
 std::ostream& operator<<(std::ostream& os, const road_network& rn)
 {
-    for(int i = 0; i < rn.size(); i++)
+    for (int i = 0; i < rn.size(); i++)
     {
-        for(int j = 0; j < rn.size(); j++)
+        for (int j = 0; j < rn.size(); j++)
             os << rn.distance_matrix[i][j] << " ";
         os << std::endl;
     }
+
+    return os;
 }

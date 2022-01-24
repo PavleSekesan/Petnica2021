@@ -2,70 +2,43 @@
 #include <iomanip>
 #include "road_network.h"
 #include "physarum_solver.h"
+#include "nsga_solver.h"
+#include "random_gen.h"
 #include <fstream>
 #include <math.h>
+#include <random>
+#include <chrono>
+#include <string>
 
 int main()
 {
-    /*std::ifstream in("input.in");
-    int v, e; in >> v >> e;
-    std::vector<std::vector<double>> distance_matrix(v, std::vector<double>(v, INFINITY));
-    for(int i = 0; i < e; i++)
-    {
-        int node1, node2; in >> node1 >> node2;
-        double weight; in >> weight;
-        distance_matrix[node1][node2] = weight;
-        distance_matrix[node2][node1] = weight;
-    }
-    int source, dest; in >> source >> dest;
-
-    std::vector<int> mapping(v);
-    mapping[source] = 0;
-    mapping[dest] = v - 1;
-    int counter = 1;
-    for(int i = 0; i < v; i++)
-    {
-        if (i != source && i != dest)
-            mapping[i] = counter++;
-    }
-
-    std::vector<std::vector<double>> new_distance_matrix(v, std::vector<double>(v, INFINITY));
-    for(int i = 0; i < v; i++)
-    {
-        for(int j = 0; j < v; j++)
-        {
-            int i1 = mapping[i];
-            int j1 = mapping[j];
-            new_distance_matrix[i1][j1] = distance_matrix[i][j];
-        }
-    }
-
-    road_network rn = road_network(new_distance_matrix);*/
-
-    int n; std::cin >> n;
+    std::string seed_str = "jajasti";
+    std::seed_seq seed(seed_str.begin(), seed_str.end());
+    random_gen::rng = std::mt19937(seed);
+    std::ifstream input("city.txt");
+    int n; input >> n;
     std::vector<node> nodes;
-    for(int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++)
     {
-        int x, y; std::cin >> x >> y;
-        double demand; std::cin >> demand;
-        nodes.push_back(node(x, y, demand));
+        double x, y, pop; input >> y >> x >> pop;
+        nodes.push_back(node(x, y, pop));
     }
-
     road_network rn = road_network(nodes);
 
-    std::ofstream file("data/conductivities.txt");
-    physarum_solver ps = physarum_solver(rn, 1, 1000);
-    ps.set_stream(std::cout);
-    std::vector<int> path = ps.solve();
-    double path_length = 0;
-    for(int i = 0; i < path.size(); i++)
+    bool solve_physarum = true;
+    bool solve_nsga = true;
+    if (solve_physarum)
     {
-        std::cout << path[i] << " ";
+        std::ofstream physarum_solution("C:/Users/Pavle/Desktop/Petnica2021 pomocne skripte/physarum.txt");
+        physarum_solver ps = physarum_solver(rn);
+        ps.set_stream(physarum_solution);
+        ps.solve();
     }
-    std::cout << std::endl;
-    for(int i = 0; i < path.size() - 1; i++)
+    if (solve_nsga)
     {
-        path_length += rn.get_distance(path[i], path[i + 1]);
+        std::ofstream nsga_solution("C:/Users/Pavle/Desktop/Petnica2021 pomocne skripte/nsga.txt");
+        nsga_solver ns = nsga_solver(rn);
+        ns.set_stream(nsga_solution);
+        ns.solve();
     }
-    std::cout << path_length << std::endl;
 }
